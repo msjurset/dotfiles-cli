@@ -1,0 +1,146 @@
+.TH DOTFILES 1 "March 2026" "version 1.0.0" "User Commands"
+.SH NAME
+dotfiles \- manage dotfiles with symlinks and git
+.SH SYNOPSIS
+.B dotfiles
+.br
+.B dotfiles status
+.br
+.B dotfiles add
+.I path
+[\fIpath\fR ...]
+.br
+.B dotfiles update
+[\fB\-m\fR \fImessage\fR]
+.br
+.B dotfiles clone
+.I repository
+[\fIpath\fR]
+.br
+.B dotfiles link
+[\fIname\fR ...]
+.br
+.B dotfiles clean
+[\fIname\fR ...]
+.SH DESCRIPTION
+.B dotfiles
+is a CLI tool for managing dotfiles in a git repository using symlinks.
+It tracks which dotfiles in the current directory are managed (symlinked into
+the dotfiles repo) and which are not. Files are moved into the repo and
+replaced with relative symlinks, matching the convention used by GNU Stow.
+.PP
+The dotfiles repository location is determined by the
+.B DOTFILES_REPO_PATH
+environment variable, falling back to
+.IR ~/.dotfiles .
+.PP
+The repo structure mirrors home-relative paths: a file at
+.I repo/.zshrc
+maps to
+.IR ~/.zshrc ,
+and
+.I repo/work/project/.claude
+maps to
+.IR ~/work/project/.claude .
+.SH COMMANDS
+.TP
+.B (none)
+List all dotfiles in the current directory, showing whether each is managed
+(symlinked into the repo) or unmanaged. Displays the symlink target for
+managed files.
+.TP
+.B status
+Show a git-status-style view of managed dotfiles. Displays pending changes
+for managed files, the count of unpushed commits, and lists unmanaged
+dotfile candidates.
+.TP
+.B add \fIpath\fR [\fIpath\fR ...]
+Move one or more files into the repo and replace them with relative
+symlinks. Accepts relative paths, absolute paths, or ~/paths. Each file
+must be under
+.IR $HOME .
+The file is stored at the corresponding home-relative path within the repo.
+If symlink creation fails after the move, the file is rolled back to its
+original location.
+.TP
+.B update \fR[\fB\-m\fR \fImessage\fR]
+Stage, commit, and push changes to managed dotfiles. When run outside the
+repo directory, only files managed from the current directory are included.
+When run inside the repo, all changes are included. If
+.B \-m
+is not provided, an auto-generated commit message listing the changed files
+is used.
+.TP
+.B clone \fIrepository\fR [\fIpath\fR]
+Clone a remote dotfiles repository and restore all symlinks by walking
+the repo contents. The default destination is
+.IR ~/.dotfiles .
+This is the primary way to bootstrap dotfiles on a new machine.
+.TP
+.B link \fR[\fIname\fR ...]
+Restore symlinks by walking the repo contents. Creates relative symlinks
+for all files in the repo, or only the specified names. Skips entries that
+are already correctly linked. Useful after cloning or if a symlink was
+accidentally deleted.
+.TP
+.B clean \fR[\fIname\fR ...]
+Remove symlinks for managed dotfiles in the current directory and copy the
+files back from the repo. If names are specified, only those are cleaned;
+otherwise all managed dotfiles in the current directory are cleaned.
+.SH OPTIONS
+.TP
+.BR \-m " \fImessage\fR"
+Commit message for the
+.B update
+command. If omitted, a message is auto-generated from the list of changed
+files.
+.SH ENVIRONMENT
+.TP
+.B DOTFILES_REPO_PATH
+Path to the dotfiles git repository. Defaults to
+.IR ~/.dotfiles .
+.SH EXAMPLES
+.TP
+.B dotfiles
+List dotfiles in the current directory with their managed status.
+.TP
+.B dotfiles status
+Show pending changes and unmanaged candidates.
+.TP
+.B dotfiles add .zshrc .vimrc
+Move .zshrc and .vimrc into the repo and create symlinks.
+.TP
+.B dotfiles update
+Auto-commit and push all pending dotfile changes.
+.TP
+.B dotfiles update \-m \(dqadd zsh config\(dq
+Commit and push with a custom message.
+.TP
+.B dotfiles clone git@github.com:user/dotfiles.git
+Clone dotfiles repo to ~/.dotfiles and restore all symlinks.
+.TP
+.B dotfiles clone git@github.com:user/dotfiles.git ~/my-dotfiles
+Clone to a custom path.
+.TP
+.B dotfiles link
+Restore all symlinks from repo contents.
+.TP
+.B dotfiles link .zshrc
+Restore only the .zshrc symlink.
+.TP
+.B dotfiles clean .bashrc
+Remove the .bashrc symlink and restore the original file.
+.TP
+.B dotfiles clean
+Remove all managed symlinks in the current directory.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+An error occurred.
+.SH AUTHOR
+Mark Sjurseth
+.SH COPYRIGHT
+Copyright (c) 2026. MIT License.
