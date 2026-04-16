@@ -1,4 +1,4 @@
-.TH DOTFILES 1 "March 2026" "version 1.0.0" "User Commands"
+.TH DOTFILES 1 "April 2026" "version 1.1.0" "User Commands"
 .SH NAME
 dotfiles \- manage dotfiles with symlinks and git
 .SH SYNOPSIS
@@ -62,6 +62,11 @@ must be under
 The file is stored at the corresponding home-relative path within the repo.
 If symlink creation fails after the move, the file is rolled back to its
 original location.
+.IP
+If a file's real path (resolving parent symlinks) is already inside the repo
+\(em for example, a new file created inside a symlinked directory like
+.I .zfuncs/
+\(em the file is staged for git without moving or symlinking.
 .TP
 .B update \fR[\fB\-m\fR \fImessage\fR]
 Stage, commit, and push changes to managed dotfiles. When run outside the
@@ -109,6 +114,9 @@ Show pending changes and unmanaged candidates.
 .TP
 .B dotfiles add .zshrc .vimrc
 Move .zshrc and .vimrc into the repo and create symlinks.
+.TP
+.B dotfiles add .zfuncs/myfunc
+Stage a new file inside an already-managed symlinked directory.
 .TP
 .B dotfiles update
 Auto-commit and push all pending dotfile changes.
