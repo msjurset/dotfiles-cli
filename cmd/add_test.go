@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -129,6 +130,50 @@ func TestAddOneNonDotfile(t *testing.T) {
 
 	if _, err := os.ReadFile(filepath.Join(r.Path, "somefile")); err != nil {
 		t.Fatal("file not in repo")
+	}
+}
+
+func TestAddOneInsideManagedSymlinkedDir(t *testing.T) {
+	r, home, cwd := setupAddTest(t)
+
+	// Initialize git repo so r.Add() works
+	if out, err := exec.Command("git", "-C", r.Path, "init").CombinedOutput(); err != nil {
+		t.Fatalf("git init: %s: %v", out, err)
+	}
+
+	// Create a directory in the repo with an existing file
+	zfuncsRepo := filepath.Join(r.Path, ".zfuncs")
+	os.MkdirAll(zfuncsRepo, 0755)
+	os.WriteFile(filepath.Join(zfuncsRepo, "existing"), []byte("# existing"), 0644)
+
+	// Symlink home/.zfuncs -> repo/.zfuncs (simulating a managed directory)
+	os.Symlink(zfuncsRepo, filepath.Join(home, ".zfuncs"))
+
+	// Create a new file directly in the repo dir (user added it by hand)
+	os.WriteFile(filepath.Join(zfuncsRepo, "newfile"), []byte("# new func"), 0644)
+
+	// Add via the symlinked path — should detect it's already in the repo
+	err := addOne(r, home, cwd, ".zfuncs/newfile")
+	if err != nil {
+		t.Fatalf("expected success for file already in repo, got: %v", err)
+	}
+
+	// File should still be a regular file at the repo path (not moved elsewhere)
+	info, err := os.Lstat(filepath.Join(zfuncsRepo, "newfile"))
+	if err != nil {
+		t.Fatal("file should still exist in repo")
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("file in repo should not be a symlink")
+	}
+
+	// Content unchanged
+	data, err := os.ReadFile(filepath.Join(zfuncsRepo, "newfile"))
+	if err != nil {
+		t.Fatal("file should be readable")
+	}
+	if string(data) != "# new func" {
+		t.Errorf("content = %q, want %q", string(data), "# new func")
 	}
 }
 

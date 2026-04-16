@@ -58,6 +58,23 @@ func addOne(r *repo.Repo, home, cwd, name string) error {
 		return fmt.Errorf("%s is not under home directory", name)
 	}
 
+	// If the file's real path (resolving parent symlinks) is already inside the
+	// repo, it doesn't need moving or symlinking — just stage it for git.
+	// This handles files created inside a symlinked directory (e.g. .zfuncs/).
+	if realPath, err := filepath.EvalSymlinks(absPath); err == nil {
+		realRepo, _ := filepath.EvalSymlinks(r.Path)
+		if repoRel, err := filepath.Rel(realRepo, realPath); err == nil && !strings.HasPrefix(repoRel, "..") {
+			if err := r.Add(repoRel); err != nil {
+				return fmt.Errorf("staging %s: %w", repoRel, err)
+			}
+			fmt.Printf("  %s %s %s\n",
+				color.Green("tracked"),
+				color.Bold(name),
+				color.Dim("(staged for commit)"))
+			return nil
+		}
+	}
+
 	// Check not already managed
 	if info.Mode()&os.ModeSymlink != 0 {
 		managed, _ := dotfile.IsManaged(absPath, r.Path)

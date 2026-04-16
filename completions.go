@@ -17,29 +17,32 @@ _dotfiles() {
         'clean:remove symlinks and restore original files'
     )
 
-    if (( CURRENT == 2 )); then
-        _describe 'command' commands
-        _files -g '.*'
-        return
-    fi
+    _arguments -C \
+        '(- *)'{-h,-help,--help}'[show help]' \
+        '(- *)'{-version,--version}'[print version and exit]' \
+        '(- *)'{-completion,--completion}'[print shell completion]:shell:(zsh bash)' \
+        '1: :->cmd' \
+        '*:: :->args' && return
 
-    case "${words[2]}" in
-        add|clean)
-            _files -g '.*'
+    case $state in
+        cmd)
+            _describe 'command' commands
             ;;
-        update)
-            _arguments \
-                '-m[commit message]:message:'
-            ;;
-        clone)
-            _arguments \
-                '1:repository:_urls' \
-                '2:path:_directories'
-            ;;
-        link)
-            _files -g '.*'
-            ;;
-        status)
+        args)
+            case ${words[1]} in
+                add|clean|link)
+                    _files -g '.*'
+                    ;;
+                update)
+                    _arguments \
+                        '-m[commit message]:message:'
+                    ;;
+                clone)
+                    _arguments \
+                        '1:repository:_urls' \
+                        '2:path:_directories'
+                    ;;
+            esac
             ;;
     esac
 }
@@ -59,11 +62,19 @@ _dotfiles() {
     commands="status add update clone link clean"
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "${commands}" -- "$cur") )
+        if [[ "$cur" == -* ]]; then
+            COMPREPLY=( $(compgen -W "-version --version -help --help -h -completion --completion" -- "$cur") )
+        else
+            COMPREPLY=( $(compgen -W "${commands}" -- "$cur") )
+        fi
         return 0
     fi
 
     case "${COMP_WORDS[1]}" in
+        -completion|--completion)
+            COMPREPLY=( $(compgen -W "zsh bash" -- "$cur") )
+            return 0
+            ;;
         add|clean|link)
             # Complete dotfiles (files starting with .)
             COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )

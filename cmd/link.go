@@ -71,7 +71,7 @@ func walkRepo(r *repo.Repo) ([]string, error) {
 		// Skip non-dotfile repo metadata at the root level
 		if !strings.Contains(rel, string(filepath.Separator)) {
 			switch d.Name() {
-			case "LICENSE", "NOTICES", "README.md", "Makefile", "mappings.json":
+			case "LICENSE", "NOTICES", "README.md", "Makefile":
 				return nil
 			}
 		}
