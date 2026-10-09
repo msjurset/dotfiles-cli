@@ -10,8 +10,12 @@ _dotfiles() {
     local -a commands
     commands=(
         'status:show changes and unmanaged candidates'
+        'diff:show changes against git repo'
         'add:move dotfiles into repo and create symlinks'
+        'sync:pull remote changes, restore symlinks, commit and push'
         'update:stage, commit, and push changes'
+        'ignore:view or add patterns to .dotfilesignore'
+        'guard:view or add sensitive guardrail patterns to .dotfilesguard'
         'clone:clone dotfiles repo and restore symlinks'
         'link:restore symlinks from repo contents'
         'clean:remove symlinks and restore original files'
@@ -21,6 +25,7 @@ _dotfiles() {
         '(- *)'{-h,-help,--help}'[show help]' \
         '(- *)'{-version,--version}'[print version and exit]' \
         '(- *)'{-completion,--completion}'[print shell completion]:shell:(zsh bash)' \
+        '(-a --all)'{-a,--all}'[show all files including ignored]' \
         '1: :->cmd' \
         '*:: :->args' && return
 
@@ -30,10 +35,24 @@ _dotfiles() {
             ;;
         args)
             case ${words[1]} in
-                add|clean|link)
+                status)
+                    _arguments \
+                        '(-a --all)'{-a,--all}'[show all files including ignored]'
+                    ;;
+                diff)
+                    _arguments \
+                        '(--staged --cached)'{--staged,--cached}'[show staged changes]' \
+                        '*:file:_files -g ".*"'
+                    ;;
+                add)
+                    _arguments \
+                        '(-f --force)'{-f,--force}'[override sensitive file guardrails]' \
+                        '*:file:_files -g ".*"'
+                    ;;
+                clean|link)
                     _files -g '.*'
                     ;;
-                update)
+                update|sync)
                     _arguments \
                         '-m[commit message]:message:'
                     ;;
@@ -59,11 +78,11 @@ _dotfiles() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="status add update clone link clean"
+    commands="status diff add sync update ignore guard clone link clean"
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
         if [[ "$cur" == -* ]]; then
-            COMPREPLY=( $(compgen -W "-version --version -help --help -h -completion --completion" -- "$cur") )
+            COMPREPLY=( $(compgen -W "-a --all -version --version -help --help -h -completion --completion" -- "$cur") )
         else
             COMPREPLY=( $(compgen -W "${commands}" -- "$cur") )
         fi
@@ -75,12 +94,34 @@ _dotfiles() {
             COMPREPLY=( $(compgen -W "zsh bash" -- "$cur") )
             return 0
             ;;
-        add|clean|link)
+        status)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-a --all" -- "$cur") )
+                return 0
+            fi
+            ;;
+        diff)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "--staged --cached" -- "$cur") )
+                return 0
+            fi
+            COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
+            return 0
+            ;;
+        add)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-f --force" -- "$cur") )
+                return 0
+            fi
+            COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
+            return 0
+            ;;
+        clean|link)
             # Complete dotfiles (files starting with .)
             COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
             return 0
             ;;
-        update)
+        update|sync)
             if [[ "$cur" == -* ]]; then
                 COMPREPLY=( $(compgen -W "-m" -- "$cur") )
                 return 0

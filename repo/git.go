@@ -42,11 +42,38 @@ func (r *Repo) Push() error {
 	return err
 }
 
+func (r *Repo) PullRebase() error {
+	_, err := r.Git("pull", "--rebase")
+	if err != nil {
+		errStr := err.Error()
+		if strings.Contains(errStr, "no tracking information") ||
+			strings.Contains(errStr, "no remote repository specified") ||
+			strings.Contains(errStr, "couldn't find remote ref") ||
+			strings.Contains(errStr, "There is no tracking information") {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
+func (r *Repo) Diff(staged bool, paths ...string) (string, error) {
+	args := []string{"diff"}
+	if staged {
+		args = append(args, "--staged")
+	}
+	if len(paths) > 0 {
+		args = append(args, "--")
+		args = append(args, paths...)
+	}
+	return r.Git(args...)
+}
+
 func (r *Repo) UnpushedCount() (int, error) {
 	out, err := r.Git("rev-list", "@{u}..HEAD", "--count")
 	if err != nil {
-		// No upstream configured
-		if strings.Contains(err.Error(), "no upstream") || strings.Contains(err.Error(), "unknown revision") {
+		// No upstream configured or unborn branch
+		if strings.Contains(err.Error(), "no upstream") || strings.Contains(err.Error(), "unknown revision") || strings.Contains(err.Error(), "no such branch") {
 			return 0, nil
 		}
 		return 0, err

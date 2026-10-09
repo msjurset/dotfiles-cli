@@ -11,9 +11,12 @@ type Entry struct {
 	IsDir   bool
 	Managed bool
 	RepoRel string
+	Ignored bool
 }
 
 func Scan(dir, repoPath string) ([]Entry, error) {
+	ignorePatterns, _ := LoadIgnorePatterns(repoPath)
+
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil, err
@@ -38,6 +41,8 @@ func Scan(dir, repoPath string) ([]Entry, error) {
 		if managed {
 			ent.Managed = true
 			ent.RepoRel = rel
+		} else {
+			ent.Ignored = IsIgnored(name, ignorePatterns)
 		}
 		result = append(result, ent)
 	}

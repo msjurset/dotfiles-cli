@@ -1,17 +1,33 @@
-.TH DOTFILES 1 "April 2026" "version 1.1.0" "User Commands"
+.TH DOTFILES 1 "April 2026" "version 1.2.0" "User Commands"
 .SH NAME
 dotfiles \- manage dotfiles with symlinks and git
 .SH SYNOPSIS
 .B dotfiles
+[\fB\-a\fR|\fB\-\-all\fR]
 .br
 .B dotfiles status
+[\fB\-a\fR|\fB\-\-all\fR]
+.br
+.B dotfiles diff
+[\fB\-\-staged\fR|\fB\-\-cached\fR]
+[\fIname\fR ...]
 .br
 .B dotfiles add
+[\fB\-f\fR|\fB\-\-force\fR]
 .I path
 [\fIpath\fR ...]
 .br
+.B dotfiles sync
+[\fB\-m\fR \fImessage\fR]
+.br
 .B dotfiles update
 [\fB\-m\fR \fImessage\fR]
+.br
+.B dotfiles ignore
+[\fIpattern\fR ...]
+.br
+.B dotfiles guard
+[\fIpattern\fR ...]
 .br
 .B dotfiles clone
 .I repository
@@ -44,61 +60,101 @@ maps to
 .IR ~/work/project/.claude .
 .SH COMMANDS
 .TP
-.B (none)
-List all dotfiles in the current directory, showing whether each is managed
-(symlinked into the repo) or unmanaged. Displays the symlink target for
-managed files.
+.B (none) [\fB\-a\fR|\fB\-\-all\fR]
+List dotfiles in the current directory, showing whether each is managed
+(symlinked into the repo) or unmanaged. Unmanaged cache, runtime, and OS noise
+are suppressed by default unless
+.B \-a
+or
+.B \-\-all
+is passed. When executed inside the dotfiles repository, tracked repository
+files are shown directly.
 .TP
-.B status
+.B status [\fB\-a\fR|\fB\-\-all\fR]
 Show a git-status-style view of managed dotfiles. Displays pending changes
-for managed files, the count of unpushed commits, and lists unmanaged
-dotfile candidates.
+for managed files, unpushed commits, and lists unmanaged dotfile candidates
+(filtered by ignore patterns). When executed inside the dotfiles repository,
+full working tree status and unpushed commits are displayed.
 .TP
-.B add \fIpath\fR [\fIpath\fR ...]
+.B diff [\fB\-\-staged\fR|\fB\-\-cached\fR] [\fIname\fR ...]
+View diff of working tree changes against the repository. If
+.B \-\-staged
+or
+.B \-\-cached
+is provided, staged changes are shown.
+.TP
+.B add [\fB\-f\fR|\fB\-\-force\fR] \fIpath\fR [\fIpath\fR ...]
 Move one or more files into the repo and replace them with relative
 symlinks. Accepts relative paths, absolute paths, or ~/paths. Each file
 must be under
 .IR $HOME .
-The file is stored at the corresponding home-relative path within the repo.
-If symlink creation fails after the move, the file is rolled back to its
-original location.
 .IP
-If a file's real path (resolving parent symlinks) is already inside the repo
-\(em for example, a new file created inside a symlinked directory like
-.I .zfuncs/
-\(em the file is staged for git without moving or symlinking.
+Files matching sensitive credential patterns (.ssh, .gnupg, id_rsa*, .env*,
+.secrets*, *.pem, *.key) are blocked by default. Use
+.B \-f
+or
+.B \-\-force
+to override the sensitive guardrail.
+.IP
+If a file's real path is already inside the repo (such as a new file in a
+symlinked directory like .zfuncs/), the file is staged for git without moving
+or re-linking.
 .TP
-.B update \fR[\fB\-m\fR \fImessage\fR]
-Stage, commit, and push changes to managed dotfiles. When run outside the
-repo directory, only files managed from the current directory are included.
-When run inside the repo, all changes are included. If
-.B \-m
-is not provided, an auto-generated commit message listing the changed files
-is used.
+.B sync [\fB\-m\fR \fImessage\fR]
+Pull remote updates with rebase, restore missing or new symlinks, and
+commit/push any local modifications in a single operation.
+.TP
+.B update [\fB\-m\fR \fImessage\fR]
+Stage, commit, pull upstream remote changes with rebase, and push changes to
+managed dotfiles. When run outside the repo directory, only files managed from
+the current directory are included. When run inside the repo, all changes are
+included.
+.TP
+.B ignore [\fIpattern\fR ...]
+List current ignore patterns or append new ignore rules to
+.IR ~/.dotfiles/.dotfilesignore .
+.TP
+.B guard [\fIpattern\fR ...]
+List current sensitive guardrail patterns or append new rules to
+.IR ~/.dotfiles/.dotfilesguard .
 .TP
 .B clone \fIrepository\fR [\fIpath\fR]
 Clone a remote dotfiles repository and restore all symlinks by walking
 the repo contents. The default destination is
 .IR ~/.dotfiles .
-This is the primary way to bootstrap dotfiles on a new machine.
 .TP
-.B link \fR[\fIname\fR ...]
+.B link [\fIname\fR ...]
 Restore symlinks by walking the repo contents. Creates relative symlinks
 for all files in the repo, or only the specified names. Skips entries that
-are already correctly linked. Useful after cloning or if a symlink was
-accidentally deleted.
+are already correctly linked.
 .TP
-.B clean \fR[\fIname\fR ...]
+.B clean [\fIname\fR ...]
 Remove symlinks for managed dotfiles in the current directory and copy the
-files back from the repo. If names are specified, only those are cleaned;
-otherwise all managed dotfiles in the current directory are cleaned.
+files back from the repo.
 .SH OPTIONS
 .TP
+.BR \-a ", " \-\-all
+Show all dotfiles, including those ignored by built-in or custom rules.
+.TP
+.BR \-f ", " \-\-force
+Override sensitive guardrail checks during
+.BR add .
+.TP
 .BR \-m " \fImessage\fR"
-Commit message for the
+Commit message for
 .B update
-command. If omitted, a message is auto-generated from the list of changed
-files.
+and
+.B sync
+commands.
+.TP
+.BR \-version ", " \-\-version
+Print version and exit.
+.TP
+.BR \-completion " \fIshell\fR"
+Print shell completion script (zsh, bash).
+.TP
+.BR \-help ", " \-\-help
+Display usage information.
 .SH ENVIRONMENT
 .TP
 .B DOTFILES_REPO_PATH
@@ -107,40 +163,34 @@ Path to the dotfiles git repository. Defaults to
 .SH EXAMPLES
 .TP
 .B dotfiles
-List dotfiles in the current directory with their managed status.
+List dotfiles in the current directory, hiding ignored cache files.
+.TP
+.B dotfiles -a
+List all dotfiles including ignored files.
 .TP
 .B dotfiles status
 Show pending changes and unmanaged candidates.
 .TP
+.B dotfiles diff
+Show working tree differences against git repo.
+.TP
 .B dotfiles add .zshrc .vimrc
 Move .zshrc and .vimrc into the repo and create symlinks.
 .TP
-.B dotfiles add .zfuncs/myfunc
-Stage a new file inside an already-managed symlinked directory.
+.B dotfiles add -f .env.template
+Force-add a file matching sensitive guardrail pattern.
 .TP
-.B dotfiles update
-Auto-commit and push all pending dotfile changes.
+.B dotfiles sync
+Pull remote changes, relink, commit and push.
 .TP
-.B dotfiles update \-m \(dqadd zsh config\(dq
-Commit and push with a custom message.
+.B dotfiles update -m \(dqupdate vimrc\(dq
+Commit and push dotfiles changes.
 .TP
-.B dotfiles clone git@github.com:user/dotfiles.git
-Clone dotfiles repo to ~/.dotfiles and restore all symlinks.
+.B dotfiles ignore \(dq*.tmp\(dq
+Add a pattern to .dotfilesignore.
 .TP
-.B dotfiles clone git@github.com:user/dotfiles.git ~/my-dotfiles
-Clone to a custom path.
-.TP
-.B dotfiles link
-Restore all symlinks from repo contents.
-.TP
-.B dotfiles link .zshrc
-Restore only the .zshrc symlink.
-.TP
-.B dotfiles clean .bashrc
-Remove the .bashrc symlink and restore the original file.
-.TP
-.B dotfiles clean
-Remove all managed symlinks in the current directory.
+.B dotfiles guard \(dq*.pfx\(dq
+Add a pattern to .dotfilesguard.
 .SH EXIT STATUS
 .TP
 .B 0

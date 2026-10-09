@@ -23,7 +23,7 @@ func TestAddOneBasic(t *testing.T) {
 
 	os.WriteFile(filepath.Join(home, ".zshrc"), []byte("# zsh"), 0644)
 
-	if err := addOne(r, home, cwd, ".zshrc"); err != nil {
+	if err := addOne(r, home, cwd, ".zshrc", false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -55,7 +55,7 @@ func TestAddOneNestedPath(t *testing.T) {
 	os.WriteFile(nested, []byte("# claude"), 0644)
 
 	// Add using an absolute path
-	if err := addOne(r, home, home, nested); err != nil {
+	if err := addOne(r, home, home, nested, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -88,7 +88,7 @@ func TestAddOneCollision(t *testing.T) {
 	// Try to add a .claude from home
 	os.WriteFile(filepath.Join(home, ".claude"), []byte("# new"), 0644)
 
-	err := addOne(r, home, cwd, ".claude")
+	err := addOne(r, home, cwd, ".claude", false)
 	if err == nil {
 		t.Fatal("expected collision error")
 	}
@@ -113,7 +113,7 @@ func TestAddOneNotUnderHome(t *testing.T) {
 	f := filepath.Join(outside, ".thing")
 	os.WriteFile(f, []byte("x"), 0644)
 
-	err := addOne(r, home, outside, ".thing")
+	err := addOne(r, home, outside, ".thing", false)
 	if err == nil {
 		t.Fatal("expected error for path outside home")
 	}
@@ -124,7 +124,7 @@ func TestAddOneNonDotfile(t *testing.T) {
 
 	os.WriteFile(filepath.Join(home, "somefile"), []byte("data"), 0644)
 
-	if err := addOne(r, home, cwd, "somefile"); err != nil {
+	if err := addOne(r, home, cwd, "somefile", false); err != nil {
 		t.Fatalf("non-dotfile add should work: %v", err)
 	}
 
@@ -153,7 +153,7 @@ func TestAddOneInsideManagedSymlinkedDir(t *testing.T) {
 	os.WriteFile(filepath.Join(zfuncsRepo, "newfile"), []byte("# new func"), 0644)
 
 	// Add via the symlinked path — should detect it's already in the repo
-	err := addOne(r, home, cwd, ".zfuncs/newfile")
+	err := addOne(r, home, cwd, ".zfuncs/newfile", false)
 	if err != nil {
 		t.Fatalf("expected success for file already in repo, got: %v", err)
 	}
@@ -174,6 +174,44 @@ func TestAddOneInsideManagedSymlinkedDir(t *testing.T) {
 	}
 	if string(data) != "# new func" {
 		t.Errorf("content = %q, want %q", string(data), "# new func")
+	}
+}
+
+func TestAddOneSensitiveGuardrails(t *testing.T) {
+	r, home, cwd := setupAddTest(t)
+
+	// Create sensitive file
+	envFile := filepath.Join(home, ".env.production")
+	os.WriteFile(envFile, []byte("SECRET=123"), 0600)
+
+	// Attempt without force should fail
+	err := addOne(r, home, cwd, ".env.production", false)
+	if err == nil {
+		t.Fatal("expected sensitive guardrail error, got nil")
+	}
+	if !contains(err.Error(), "sensitive guardrail") {
+		t.Fatalf("expected sensitive guardrail error, got: %v", err)
+	}
+
+	// Original file must still exist and not be moved
+	if _, err := os.Stat(envFile); err != nil {
+		t.Fatal("original file was removed")
+	}
+
+	// Attempt with force should succeed
+	if err := addOne(r, home, cwd, ".env.production", true); err != nil {
+		t.Fatalf("forced add failed: %v", err)
+	}
+
+	// Check it was moved and symlinked
+	data, err := os.ReadFile(filepath.Join(r.Path, ".env.production"))
+	if err != nil || string(data) != "SECRET=123" {
+		t.Fatal("file not moved to repo")
+	}
+
+	info, err := os.Lstat(envFile)
+	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatal("symlink not created")
 	}
 }
 

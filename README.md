@@ -65,9 +65,9 @@ Download from the [releases page](https://github.com/msjurset/dotfiles-cli/relea
 
 ## Commands
 
-### `dotfiles` (no arguments)
+### `dotfiles [-a|--all]` (no arguments or `list`)
 
-List dotfiles in the current directory, showing which ones are managed (symlinked into the repo) and which aren't.
+List dotfiles in the current directory, showing which ones are managed (symlinked into the repo) and which aren't. Common cache, runtime, and OS files (`.DS_Store`, `.Trash`, `.*_history`, `.cache`, `.npm`, etc.) are hidden by default to keep the output clean. Pass `-a` or `--all` to show all files including ignored items.
 
 ```bash
 $ cd ~
@@ -76,14 +76,15 @@ $ dotfiles
   managed   file  .vimrc     -> .dotfiles/.vimrc
   managed   dir   .config    -> .dotfiles/.config
   unmanaged file  .bashrc
-  unmanaged dir   .ssh
+
+(32 unmanaged dotfile(s) hidden by ignore rules; use -a or --all to show)
 ```
 
-This is useful for seeing what's tracked at a glance without touching git.
+When run inside the dotfiles repository (`~/.dotfiles`), it automatically recognizes the repo environment and displays tracked files instead of listing repo files as unmanaged.
 
-### `dotfiles status`
+### `dotfiles status [-a|--all]`
 
-A git-status-style view showing pending changes to managed files and any unmanaged candidates worth considering.
+A git-status-style view showing pending changes to managed files and unmanaged candidates worth considering. Filtered by ignore patterns (use `-a` or `--all` to view all).
 
 ```bash
 $ dotfiles status
@@ -93,7 +94,8 @@ Changes:
 
 Unmanaged dotfiles:
   file  .bashrc
-  dir   .ssh
+
+(32 unmanaged dotfile(s) hidden by ignore rules; use -a or --all to show)
 ```
 
 If there are unpushed commits, it tells you that too:
@@ -105,7 +107,24 @@ $ dotfiles status
 All managed dotfiles are clean.
 ```
 
-### `dotfiles add <path> [path...]`
+When run inside `~/.dotfiles`, `status` reports the full git working tree status and unpushed commits directly.
+
+### `dotfiles diff [--staged|--cached] [name...]`
+
+View changes made to managed dotfiles against the git repository. Accepts optional dotfile names and supports `--staged` (or `--cached`) to inspect staged modifications.
+
+```bash
+# View working tree diff for all modified managed files
+$ dotfiles diff
+
+# View diff for a specific file
+$ dotfiles diff .zshrc
+
+# View staged changes
+$ dotfiles diff --staged
+```
+
+### `dotfiles add [--force|-f] <path> [path...]`
 
 Move a file (or files) into the repo and replace the original with a relative symlink. Accepts multiple paths at once.
 
@@ -131,6 +150,23 @@ dotfiles add /Users/me/.bashrc            # absolute
 
 Nested paths are preserved. Adding `~/.config/nvim/init.vim` creates `~/.dotfiles/.config/nvim/init.vim` and the necessary parent directories in the repo.
 
+#### Sensitive File Guardrails
+
+To prevent accidental leaks of credentials and secrets, `dotfiles add` automatically blocks files matching sensitive patterns (`.ssh`, `.gnupg`, `id_rsa*`, `id_ed25519*`, `*.pem`, `*.key`, `.env*`, `.secrets*`, `.aws`, etc.):
+
+```bash
+$ dotfiles add .env.production
+  error .env.production: matches sensitive guardrail pattern ".env*" (use --force or -f to override)
+```
+
+Pass `--force` or `-f` to explicitly override the guardrail when tracking is genuinely intended:
+
+```bash
+$ dotfiles add -f .env.template
+  warning .env.template: matched sensitive guardrail ".env*" (forced)
+  added .env.template -> .dotfiles/.env.template
+```
+
 #### Adding files inside managed directories
 
 If a directory is already managed (symlinked), new files created inside it are physically already in the repo. `dotfiles add` detects this and stages the file for git without trying to move or re-symlink anything:
@@ -153,9 +189,23 @@ $ dotfiles update -m "add myfunc"
 - **Collision detection**: if the repo already has a file at that path (and it's not the symlink case above), `add` refuses and leaves your original file untouched.
 - **Rollback on failure**: if creating the symlink fails after the file has been moved, `add` moves it back.
 
+### `dotfiles sync [-m "message"]`
+
+Pull remote updates (`git pull --rebase`), automatically restore any missing or new symlinks (`dotfiles link`), and commit/push local modifications in a single command. Ideal for moving between multiple workstations.
+
+```bash
+$ dotfiles sync
+Pulling latest changes from remote...
+Repository up to date with remote.
+Checking symlinks...
+  linked   .alacritty.toml -> ~/.alacritty.toml
+1 linked, 12 already ok, 0 failed
+All dotfiles in sync!
+```
+
 ### `dotfiles update [-m "message"]`
 
-Stage all changes, commit, and push — the one-liner for "I edited some dotfiles, ship it."
+Stage all changes, commit, pull any upstream remote changes with rebase, and push — the one-liner for "I edited some dotfiles, ship it."
 
 ```bash
 # Auto-generated commit message based on changed filenames
@@ -181,6 +231,34 @@ Pushed.
 - **Run from any other directory** (e.g., `~`): only stages changes to dotfiles managed from that directory.
 
 This means you can `cd ~` and run `dotfiles update` without worrying about accidentally committing work-in-progress changes to files managed from other directories.
+
+### `dotfiles ignore [pattern...]`
+
+View active ignore patterns or append new ignore rules to `~/.dotfiles/.dotfilesignore`. Automatically stages the ignore file for git.
+
+```bash
+# View active ignore rules (defaults + custom)
+$ dotfiles ignore
+
+# Add new ignore patterns
+$ dotfiles ignore "*.tmp" ".mypy_cache"
+  ignored *.tmp (added to .dotfilesignore)
+  ignored .mypy_cache (added to .dotfilesignore)
+```
+
+### `dotfiles guard [pattern...]`
+
+View sensitive guardrails or append custom sensitive patterns to `~/.dotfiles/.dotfilesguard`. Automatically stages the guard file for git.
+
+```bash
+# View active guardrails
+$ dotfiles guard
+
+# Guard additional sensitive files
+$ dotfiles guard "*.pfx" "server.key"
+  guarded *.pfx (added to .dotfilesguard)
+  guarded server.key (added to .dotfilesguard)
+```
 
 ### `dotfiles clone <repo> [path]`
 

@@ -21,11 +21,7 @@ func Update(message string) error {
 		return err
 	}
 
-	// Determine scope
-	inRepo := false
-	if rel, err := filepath.Rel(r.Path, cwd); err == nil && !strings.HasPrefix(rel, "..") {
-		inRepo = true
-	}
+	inRepo, _ := isInside(r.Path, cwd)
 
 	var paths []string
 	if inRepo {
@@ -90,6 +86,10 @@ func Update(message string) error {
 		return fmt.Errorf("commit: %w", err)
 	}
 	fmt.Printf("%s %s\n", color.Green("Committed:"), message)
+
+	if err := r.PullRebase(); err != nil {
+		return fmt.Errorf("pull --rebase: %w", err)
+	}
 
 	if err := r.Push(); err != nil {
 		return fmt.Errorf("push: %w", err)

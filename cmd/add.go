@@ -13,7 +13,7 @@ import (
 
 func Add(names []string) error {
 	if len(names) == 0 {
-		return fmt.Errorf("usage: dotfiles add <path> [path...]")
+		return fmt.Errorf("usage: dotfiles add [--force|-f] <path> [path...]")
 	}
 	r, err := repo.Discover()
 	if err != nil {
@@ -28,15 +28,29 @@ func Add(names []string) error {
 		return err
 	}
 
-	for _, name := range names {
-		if err := addOne(r, home, cwd, name); err != nil {
+	force := false
+	var paths []string
+	for _, n := range names {
+		if n == "--force" || n == "-f" {
+			force = true
+		} else {
+			paths = append(paths, n)
+		}
+	}
+
+	if len(paths) == 0 {
+		return fmt.Errorf("usage: dotfiles add [--force|-f] <path> [path...]")
+	}
+
+	for _, name := range paths {
+		if err := addOne(r, home, cwd, name, force); err != nil {
 			fmt.Fprintf(os.Stderr, "  %s %s: %v\n", color.Red("error"), name, err)
 		}
 	}
 	return nil
 }
 
-func addOne(r *repo.Repo, home, cwd, name string) error {
+func addOne(r *repo.Repo, home, cwd, name string, force bool) error {
 	// Resolve to absolute path: support absolute paths, ~/paths, and relative paths
 	absPath := name
 	if strings.HasPrefix(absPath, "~/") {
@@ -58,21 +72,28 @@ func addOne(r *repo.Repo, home, cwd, name string) error {
 		return fmt.Errorf("%s is not under home directory", name)
 	}
 
+	// Sensitive guardrail check
+	guardPatterns, _ := dotfile.LoadGuardPatterns(r.Path)
+	if sensitive, pattern := dotfile.IsSensitive(absPath, guardPatterns); sensitive {
+		if !force {
+			return fmt.Errorf("matches sensitive guardrail pattern %q (use --force or -f to override)", pattern)
+		}
+		fmt.Printf("  %s %s: matched sensitive guardrail %q (forced)\n",
+			color.Yellow("warning"), color.Bold(name), pattern)
+	}
+
 	// If the file's real path (resolving parent symlinks) is already inside the
 	// repo, it doesn't need moving or symlinking — just stage it for git.
 	// This handles files created inside a symlinked directory (e.g. .zfuncs/).
-	if realPath, err := filepath.EvalSymlinks(absPath); err == nil {
-		realRepo, _ := filepath.EvalSymlinks(r.Path)
-		if repoRel, err := filepath.Rel(realRepo, realPath); err == nil && !strings.HasPrefix(repoRel, "..") {
-			if err := r.Add(repoRel); err != nil {
-				return fmt.Errorf("staging %s: %w", repoRel, err)
-			}
-			fmt.Printf("  %s %s %s\n",
-				color.Green("tracked"),
-				color.Bold(name),
-				color.Dim("(staged for commit)"))
-			return nil
+	if inside, repoRel := isInside(r.Path, absPath); inside {
+		if err := r.Add(repoRel); err != nil {
+			return fmt.Errorf("staging %s: %w", repoRel, err)
 		}
+		fmt.Printf("  %s %s %s\n",
+			color.Green("tracked"),
+			color.Bold(name),
+			color.Dim("(staged for commit)"))
+		return nil
 	}
 
 	// Check not already managed
