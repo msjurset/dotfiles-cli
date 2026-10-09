@@ -9,7 +9,7 @@ import (
 	"github.com/msjurset/dotfiles/repo"
 )
 
-func Sync(message string) error {
+func Sync(message string, force bool) error {
 	r, err := repo.Discover()
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func Sync(message string) error {
 
 	if out != "" {
 		fmt.Println("\nLocal changes detected, committing and pushing...")
-		return Update(message)
+		return Update(message, force)
 	}
 
 	// Push any existing unpushed commits

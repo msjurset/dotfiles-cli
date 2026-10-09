@@ -12,6 +12,10 @@ _dotfiles() {
         'add:move dotfiles into repo and create symlinks'
         'sync:pull remote changes, restore symlinks, commit and push'
         'update:stage, commit, and push changes'
+        'doctor:check health of symlinks and permissions'
+        'audit:scan managed dotfiles for sensitive credentials'
+        'edit:open matching dotfile directly in $EDITOR'
+        'log:show commit history for dotfiles repo or specific file'
         'ignore:view or add patterns to .dotfilesignore'
         'guard:view or add sensitive guardrail patterns to .dotfilesguard'
         'clone:clone dotfiles repo and restore symlinks'
@@ -47,12 +51,22 @@ _dotfiles() {
                         '(-f --force)'{-f,--force}'[override sensitive file guardrails]' \
                         '*:file:_files -g ".*"'
                     ;;
-                clean|link)
+                doctor)
+                    _arguments \
+                        '(--fix -f)'{--fix,-f}'[automatically repair issues]'
+                    ;;
+                audit|edit|clean|link)
                     _files -g '.*'
+                    ;;
+                log)
+                    _arguments \
+                        '-n[number of commits to display]:count:' \
+                        '*:file:_files -g ".*"'
                     ;;
                 update|sync)
                     _arguments \
-                        '-m[commit message]:message:'
+                        '-m[commit message]:message:' \
+                        '(-f --force)'{-f,--force}'[override secret scanner]'
                     ;;
                 clone)
                     _arguments \

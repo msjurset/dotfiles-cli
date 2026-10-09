@@ -1,4 +1,4 @@
-.TH DOTFILES 1 "April 2026" "version 1.2.0" "User Commands"
+.TH DOTFILES 1 "April 2026" "version 1.3.0" "User Commands"
 .SH NAME
 dotfiles \- manage dotfiles with symlinks and git
 .SH SYNOPSIS
@@ -19,9 +19,24 @@ dotfiles \- manage dotfiles with symlinks and git
 .br
 .B dotfiles sync
 [\fB\-m\fR \fImessage\fR]
+[\fB\-f\fR|\fB\-\-force\fR]
 .br
 .B dotfiles update
 [\fB\-m\fR \fImessage\fR]
+[\fB\-f\fR|\fB\-\-force\fR]
+.br
+.B dotfiles doctor
+[\fB\-\-fix\fR|\fB\-f\fR]
+.br
+.B dotfiles audit
+[\fIpath\fR ...]
+.br
+.B dotfiles edit
+[\fIquery\fR]
+.br
+.B dotfiles log
+[\fB\-n\fR \fIcount\fR]
+[\fIpath\fR]
 .br
 .B dotfiles ignore
 [\fIpattern\fR ...]
@@ -100,15 +115,42 @@ If a file's real path is already inside the repo (such as a new file in a
 symlinked directory like .zfuncs/), the file is staged for git without moving
 or re-linking.
 .TP
-.B sync [\fB\-m\fR \fImessage\fR]
+.B sync [\fB\-m\fR \fImessage\fR] [\fB\-f\fR|\fB\-\-force\fR]
 Pull remote updates with rebase, restore missing or new symlinks, and
-commit/push any local modifications in a single operation.
+commit/push any local modifications in a single operation. Scans files for
+secrets before committing; use
+.B \-f
+or
+.B \-\-force
+to override.
 .TP
-.B update [\fB\-m\fR \fImessage\fR]
+.B update [\fB\-m\fR \fImessage\fR] [\fB\-f\fR|\fB\-\-force\fR]
 Stage, commit, pull upstream remote changes with rebase, and push changes to
 managed dotfiles. When run outside the repo directory, only files managed from
 the current directory are included. When run inside the repo, all changes are
-included.
+included. Performs secret content checks before committing.
+.TP
+.B doctor [\fB\-\-fix\fR|\fB\-f\fR]
+Check health of managed dotfiles, identifying clobbered symlinks (files overwritten
+as regular files), missing symlinks, dangling pointers, and insecure permissions
+on sensitive directories. Pass
+.B \-\-fix
+to automatically repair issues and backup modified local files.
+.TP
+.B audit [\fIpath\fR ...]
+Scan managed dotfiles in the repository for credentials, private keys, AWS tokens,
+GitHub PATs, Google API keys, OpenAI keys, and Slack tokens.
+.TP
+.B edit [\fIquery\fR]
+Find and open matching managed dotfile directly in
+.B $EDITOR
+or
+.BR $VISUAL .
+Accepts fuzzy, prefix, or substring queries (e.g. zsh, alias, tmux). If no query
+is given, opens the repository root directory.
+.TP
+.B log [\fB\-n\fR \fIcount\fR] [\fIpath\fR]
+Display formatted commit history for the dotfiles repository or a specific dotfile.
 .TP
 .B ignore [\fIpattern\fR ...]
 List current ignore patterns or append new ignore rules to
@@ -138,7 +180,15 @@ Show all dotfiles, including those ignored by built-in or custom rules.
 .TP
 .BR \-f ", " \-\-force
 Override sensitive guardrail checks during
-.BR add .
+.B add
+or bypass secret content warnings during
+.B update
+and
+.BR sync .
+.TP
+.BR \-\-fix
+Automatically repair health issues identified by
+.BR doctor .
 .TP
 .BR \-m " \fImessage\fR"
 Commit message for
@@ -146,6 +196,10 @@ Commit message for
 and
 .B sync
 commands.
+.TP
+.BR \-n " \fIcount\fR"
+Number of commits to display in
+.BR log .
 .TP
 .BR \-version ", " \-\-version
 Print version and exit.
@@ -160,37 +214,32 @@ Display usage information.
 .B DOTFILES_REPO_PATH
 Path to the dotfiles git repository. Defaults to
 .IR ~/.dotfiles .
+.TP
+.B EDITOR ", " VISUAL
+Default text editor invoked by
+.BR edit .
 .SH EXAMPLES
 .TP
-.B dotfiles
-List dotfiles in the current directory, hiding ignored cache files.
+.B dotfiles doctor
+Check for clobbered or broken symlinks.
 .TP
-.B dotfiles -a
-List all dotfiles including ignored files.
+.B dotfiles doctor --fix
+Repair broken symlinks and backup clobbered files.
 .TP
-.B dotfiles status
-Show pending changes and unmanaged candidates.
+.B dotfiles audit
+Scan dotfiles for leaked secrets.
+.TP
+.B dotfiles edit zsh
+Open ~/.dotfiles/.zshrc in your configured editor.
+.TP
+.B dotfiles log -n 5
+Show last 5 dotfiles commits with relative timestamps.
 .TP
 .B dotfiles diff
 Show working tree differences against git repo.
 .TP
-.B dotfiles add .zshrc .vimrc
-Move .zshrc and .vimrc into the repo and create symlinks.
-.TP
-.B dotfiles add -f .env.template
-Force-add a file matching sensitive guardrail pattern.
-.TP
 .B dotfiles sync
 Pull remote changes, relink, commit and push.
-.TP
-.B dotfiles update -m \(dqupdate vimrc\(dq
-Commit and push dotfiles changes.
-.TP
-.B dotfiles ignore \(dq*.tmp\(dq
-Add a pattern to .dotfilesignore.
-.TP
-.B dotfiles guard \(dq*.pfx\(dq
-Add a pattern to .dotfilesguard.
 .SH EXIT STATUS
 .TP
 .B 0

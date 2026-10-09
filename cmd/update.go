@@ -11,7 +11,7 @@ import (
 	"github.com/msjurset/dotfiles/repo"
 )
 
-func Update(message string) error {
+func Update(message string, force bool) error {
 	r, err := repo.Discover()
 	if err != nil {
 		return err
@@ -58,6 +58,20 @@ func Update(message string) error {
 		if line != "" {
 			fmt.Printf("  %s\n", colorStatus(line))
 		}
+	}
+
+	// Extract changed file paths
+	var changedFiles []string
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if len(line) > 3 {
+			changedFiles = append(changedFiles, filepath.Clean(strings.TrimSpace(line[2:])))
+		}
+	}
+
+	// Check for secrets before committing
+	if err := CheckPathsForSecrets(r.Path, changedFiles, force); err != nil {
+		return err
 	}
 
 	// Stage

@@ -66,22 +66,46 @@ func run() error {
 		return cmd.Add(args[1:])
 	case "sync":
 		msg := ""
+		force := false
 		for i := 1; i < len(args); i++ {
-			if args[i] == "-m" && i+1 < len(args) {
+			if (args[i] == "-m" || args[i] == "--message") && i+1 < len(args) {
 				msg = args[i+1]
-				break
+				i++
+			} else if args[i] == "-f" || args[i] == "--force" {
+				force = true
 			}
 		}
-		return cmd.Sync(msg)
+		return cmd.Sync(msg, force)
 	case "update":
 		msg := ""
+		force := false
 		for i := 1; i < len(args); i++ {
-			if args[i] == "-m" && i+1 < len(args) {
+			if (args[i] == "-m" || args[i] == "--message") && i+1 < len(args) {
 				msg = args[i+1]
-				break
+				i++
+			} else if args[i] == "-f" || args[i] == "--force" {
+				force = true
 			}
 		}
-		return cmd.Update(msg)
+		return cmd.Update(msg, force)
+	case "doctor":
+		fix := false
+		for _, a := range args[1:] {
+			if a == "--fix" || a == "-f" {
+				fix = true
+			}
+		}
+		return cmd.Doctor(fix)
+	case "audit":
+		return cmd.Audit(args[1:])
+	case "edit":
+		query := ""
+		if len(args) > 1 {
+			query = args[1]
+		}
+		return cmd.Edit(query)
+	case "log":
+		return cmd.Log(args[1:])
 	case "ignore":
 		return cmd.Ignore(args[1:])
 	case "guard":
@@ -93,7 +117,7 @@ func run() error {
 	case "clean":
 		return cmd.Clean(args[1:])
 	default:
-		return fmt.Errorf("unknown command: %s\nUsage: dotfiles [status|diff|add|sync|update|ignore|guard|clone|link|clean]", args[0])
+		return fmt.Errorf("unknown command: %s\nUsage: dotfiles [status|diff|add|sync|update|doctor|audit|edit|log|ignore|guard|clone|link|clean]", args[0])
 	}
 }
 
@@ -108,7 +132,11 @@ Commands:
   diff         Show changes against git repo (--staged for cached)
   add <path>   Move file into repo, create symlink (-f for sensitive)
   sync         Pull remote changes, restore symlinks, commit & push
-  update       Stage, commit, and push changes
+  update       Stage, commit, and push changes (-f to override secrets)
+  doctor       Check health of symlinks and permissions (--fix to repair)
+  audit        Scan managed dotfiles for sensitive credentials/keys
+  edit [query] Open matching dotfile directly in $EDITOR
+  log [path]   Show commit history for dotfiles repo or specific file
   ignore       View or add patterns to .dotfilesignore
   guard        View or add sensitive guardrail patterns to .dotfilesguard
   clone <repo> Clone dotfiles repo and restore symlinks
@@ -117,8 +145,10 @@ Commands:
 
 Options:
   -a, --all    Show all files including ignored
-  -f, --force  Override sensitive file guardrails (for add command)
+  -f, --force  Override sensitive guardrails / allow secrets
   -m "msg"     Commit message (for update and sync commands)
+  --fix        Automatically repair issues found by doctor
+  -n <count>   Number of commits to display (for log command)
   -version     Print version and exit
   -completion  Print shell completion (zsh, bash)
   -help        Show this help

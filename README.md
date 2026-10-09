@@ -232,6 +232,76 @@ Pushed.
 
 This means you can `cd ~` and run `dotfiles update` without worrying about accidentally committing work-in-progress changes to files managed from other directories.
 
+### `dotfiles doctor [--fix]`
+
+Audit your dotfiles setup for drift, clobbered symlinks, dangling pointers, and insecure permissions:
+
+```bash
+$ dotfiles doctor
+Checking dotfiles health...
+  [CLOBBERED] .zshrc in ~ is a regular file, not a symlink to repo
+  [MISSING]   .tmux.conf is missing symlink in home directory
+
+doctor: detected 2 issue(s). Run 'dotfiles doctor --fix' to automatically repair them.
+```
+
+Passing `--fix` (or `-f`) automatically repairs detected issues:
+- **Clobbered symlinks:** Safely backs up modified local files (`.backup.<timestamp>`) and restores the symlink.
+- **Missing symlinks:** Restores missing symlinks and creates parent directories as needed.
+- **Misdirected symlinks:** Re-points incorrect symlinks to the proper repository target.
+- **Permissions:** Tightens overly permissive `~/.ssh` or `~/.gnupg` directories.
+
+```bash
+$ dotfiles doctor --fix
+Applying fixes...
+    Backed up existing file to .zshrc.backup.1791587408
+  fixed ~/.zshrc
+  fixed ~/.tmux.conf
+Complete: Repaired 2 of 2 issue(s).
+```
+
+### `dotfiles audit [path...]`
+
+Scan your dotfiles for accidentally committed secrets and credentials. Inspects files for private key headers, AWS access keys, GitHub personal access tokens, Google API keys, OpenAI keys, and Slack tokens:
+
+```bash
+$ dotfiles audit
+WARNING .env.backup:
+  line 4: AWS Access Key ID (AKIA...MPLE)
+  line 8: GitHub Personal Access Token (ghp_...bcde)
+
+error: audit detected 2 potential credential(s)
+```
+
+The secret scanner also runs automatically during `dotfiles update` and `dotfiles sync` to prevent committing or pushing credentials to remote repositories. Use `-f` or `--force` if you intentionally need to commit an exempted pattern.
+
+### `dotfiles edit [query]`
+
+Quickly jump straight into editing any managed dotfile in `$EDITOR` (or `$VISUAL`, `nvim`, `vim`, `nano`) regardless of your current directory:
+
+```bash
+dotfiles edit zsh        # matches ~/.dotfiles/.zshrc
+dotfiles edit alias      # matches ~/.dotfiles/.aliases
+dotfiles edit nvim       # matches ~/.dotfiles/.config/nvim/init.vim
+dotfiles edit tmux       # matches ~/.dotfiles/.tmux.conf
+```
+
+If run with no arguments, `dotfiles edit` opens the root repository directory in your editor. Upon exiting, if the file was modified, `edit` reminds you to run `dotfiles update` to commit and push.
+
+### `dotfiles log [-n <count>] [path]`
+
+View a compact, formatted history of your configuration changes with relative timestamps and author info:
+
+```bash
+$ dotfiles log -n 5
+  9ea22e8  (3 hours ago)   Mark Sjurseth   Add in-repo awareness, ignore filtering, guardrails
+  973780d  (yesterday)     Mark Sjurseth   Add caf alias and mybrewapps speedup
+  dd825b8  (2 days ago)    Mark Sjurseth   Add stow compatibility docs
+
+# View history specific to a file
+$ dotfiles log .zshrc
+```
+
 ### `dotfiles ignore [pattern...]`
 
 View active ignore patterns or append new ignore rules to `~/.dotfiles/.dotfilesignore`. Automatically stages the ignore file for git.

@@ -84,3 +84,48 @@ func (r *Repo) UnpushedCount() (int, error) {
 	}
 	return n, nil
 }
+
+type CommitInfo struct {
+	Hash    string
+	Author  string
+	RelDate string
+	Subject string
+}
+
+func (r *Repo) Log(count int, path string) ([]CommitInfo, error) {
+	if count <= 0 {
+		count = 10
+	}
+	args := []string{"log", fmt.Sprintf("-n%d", count), "--format=%h|%an|%ar|%s"}
+	if path != "" {
+		args = append(args, "--", path)
+	}
+	out, err := r.Git(args...)
+	if err != nil {
+		if strings.Contains(err.Error(), "does not have any commits yet") || strings.Contains(err.Error(), "unknown revision") {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if out == "" {
+		return nil, nil
+	}
+
+	var commits []CommitInfo
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) == 4 {
+			commits = append(commits, CommitInfo{
+				Hash:    parts[0],
+				Author:  parts[1],
+				RelDate: parts[2],
+				Subject: parts[3],
+			})
+		}
+	}
+	return commits, nil
+}

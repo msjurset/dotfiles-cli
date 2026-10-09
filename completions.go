@@ -14,6 +14,10 @@ _dotfiles() {
         'add:move dotfiles into repo and create symlinks'
         'sync:pull remote changes, restore symlinks, commit and push'
         'update:stage, commit, and push changes'
+        'doctor:check health of symlinks and permissions'
+        'audit:scan managed dotfiles for sensitive credentials'
+        'edit:open matching dotfile directly in $EDITOR'
+        'log:show commit history for dotfiles repo or specific file'
         'ignore:view or add patterns to .dotfilesignore'
         'guard:view or add sensitive guardrail patterns to .dotfilesguard'
         'clone:clone dotfiles repo and restore symlinks'
@@ -49,12 +53,22 @@ _dotfiles() {
                         '(-f --force)'{-f,--force}'[override sensitive file guardrails]' \
                         '*:file:_files -g ".*"'
                     ;;
-                clean|link)
+                doctor)
+                    _arguments \
+                        '(--fix -f)'{--fix,-f}'[automatically repair issues]'
+                    ;;
+                audit|edit|clean|link)
                     _files -g '.*'
+                    ;;
+                log)
+                    _arguments \
+                        '-n[number of commits to display]:count:' \
+                        '*:file:_files -g ".*"'
                     ;;
                 update|sync)
                     _arguments \
-                        '-m[commit message]:message:'
+                        '-m[commit message]:message:' \
+                        '(-f --force)'{-f,--force}'[override secret scanner]'
                     ;;
                 clone)
                     _arguments \
@@ -78,7 +92,7 @@ _dotfiles() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="status diff add sync update ignore guard clone link clean"
+    commands="status diff add sync update doctor audit edit log ignore guard clone link clean"
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
         if [[ "$cur" == -* ]]; then
@@ -116,19 +130,31 @@ _dotfiles() {
             COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
             return 0
             ;;
-        clean|link)
-            # Complete dotfiles (files starting with .)
+        doctor)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "--fix -f" -- "$cur") )
+                return 0
+            fi
+            ;;
+        audit|edit|clean|link)
+            COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
+            return 0
+            ;;
+        log)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-n" -- "$cur") )
+                return 0
+            fi
             COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
             return 0
             ;;
         update|sync)
             if [[ "$cur" == -* ]]; then
-                COMPREPLY=( $(compgen -W "-m" -- "$cur") )
+                COMPREPLY=( $(compgen -W "-m -f --force" -- "$cur") )
                 return 0
             fi
             ;;
         clone)
-            # Complete directories for the path argument
             COMPREPLY=( $(compgen -d -- "$cur") )
             return 0
             ;;
