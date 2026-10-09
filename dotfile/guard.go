@@ -31,6 +31,10 @@ var DefaultGuardrails = []string{
 	".azure",
 	".netrc",
 	".dockercfg",
+	".docker",
+	".kube",
+	".claude.json*",
+	"*auth_token*",
 }
 
 // LoadGuardPatterns loads custom sensitive patterns from ~/.dotfiles/.dotfilesguard
