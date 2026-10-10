@@ -95,13 +95,80 @@ func Deps(strict bool) error {
 	return nil
 }
 
-// ScanDependencies inspects shell scripts in repoPath and checks if invoked tools exist in PATH.
+var shellCache = make(map[string]bool)
+
+func isShellCommand(name string) bool {
+	if res, ok := shellCache[name]; ok {
+		return res
+	}
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "zsh"
+	}
+	var cmd *exec.Cmd
+	if strings.Contains(shell, "zsh") {
+		cmd = exec.Command(shell, "-i", "-c", "whence -w "+name)
+	} else {
+		cmd = exec.Command(shell, "-i", "-c", "type -t "+name)
+	}
+	out, err := cmd.Output()
+	res := false
+	if err == nil {
+		s := strings.TrimSpace(string(out))
+		if strings.Contains(s, ": function") || strings.Contains(s, ": builtin") || strings.Contains(s, ": alias") || strings.Contains(s, ": command") || s == "function" || s == "builtin" || s == "alias" || s == "file" {
+			res = true
+		}
+	}
+	shellCache[name] = res
+	return res
+}
+
+// ScanDependencies inspects shell scripts in repoPath and checks if invoked tools exist in PATH or shell environment.
 func ScanDependencies(repoPath string) (map[string]bool, map[string][]ToolReference, error) {
 	installed := make(map[string]bool)
 	missing := make(map[string][]ToolReference)
 
-	aliasTargetRegex := regexp.MustCompile(`(?i)^\s*alias\s+[A-Za-z0-9_.-]+\s*=\s*['"]?([A-Za-z0-9_.-]+)`)
-	checkCmdRegex := regexp.MustCompile(`(?i)(?:command\s+-v|type|which)\s+([A-Za-z0-9_.-]+)`)
+	aliasRegex := regexp.MustCompile(`(?i)^\s*alias\s+[A-Za-z0-9_.-]+\s*=\s*(.+)`)
+	evalCmdRegex := regexp.MustCompile(`(?i)\beval\s+["']?\$\(\s*([^\s)]+)`)
+	probeCmdRegex := regexp.MustCompile(`(?i)(?:^|[;&|]\s*|\bif\s+|\belif\s+)(?:command\s+-v|which)\s+([A-Za-z0-9_.-]+)`)
+
+	var checkCandidate = func(cmdName, rel string, lineNum int, line string, isRequired bool) {
+		cmdName = strings.Trim(cmdName, `"'`)
+		if strings.Contains(cmdName, "/") {
+			cmdName = filepath.Base(cmdName)
+		}
+		if cmdName == "" || shellBuiltins[cmdName] || strings.HasPrefix(cmdName, "-") {
+			return
+		}
+		if installed[cmdName] {
+			return
+		}
+
+		if _, err := exec.LookPath(cmdName); err == nil {
+			installed[cmdName] = true
+			return
+		}
+
+		if defs, _ := FindDefinitions(repoPath, cmdName); len(defs) > 0 {
+			installed[cmdName] = true
+			return
+		}
+
+		if isShellCommand(cmdName) {
+			installed[cmdName] = true
+			return
+		}
+
+		// Only add to missing if it is an actual requirement, not an optional probe
+		if isRequired {
+			missing[cmdName] = append(missing[cmdName], ToolReference{
+				Tool:     cmdName,
+				FilePath: rel,
+				LineNum:  lineNum,
+				Context:  line,
+			})
+		}
+	}
 
 	err := filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -155,33 +222,43 @@ func ScanDependencies(repoPath string) (map[string]bool, map[string][]ToolRefere
 				continue
 			}
 
-			var candidates []string
-			if sm := aliasTargetRegex.FindStringSubmatch(line); len(sm) > 1 {
-				candidates = append(candidates, sm[1])
-			}
-			if sm := checkCmdRegex.FindStringSubmatch(line); len(sm) > 1 {
-				candidates = append(candidates, sm[1])
-			}
-
-			for _, cmdName := range candidates {
-				cmdName = strings.Trim(cmdName, `"'`)
-				if cmdName == "" || shellBuiltins[cmdName] || strings.HasPrefix(cmdName, "-") || strings.Contains(cmdName, "/") {
-					continue
-				}
-
-				if _, err := exec.LookPath(cmdName); err == nil {
-					installed[cmdName] = true
-				} else if defs, _ := FindDefinitions(repoPath, cmdName); len(defs) > 0 {
-					// Defined internally as a shell function, alias, or autoload file
-					installed[cmdName] = true
+			// 1. Check alias commands (required)
+			if sm := aliasRegex.FindStringSubmatch(line); len(sm) > 1 {
+				val := strings.TrimSpace(sm[1])
+				if strings.HasPrefix(val, "'") {
+					if idx := strings.Index(val[1:], "'"); idx != -1 {
+						val = val[1 : 1+idx]
+					}
+				} else if strings.HasPrefix(val, "\"") {
+					if idx := strings.Index(val[1:], "\""); idx != -1 {
+						val = val[1 : 1+idx]
+					}
 				} else {
-					missing[cmdName] = append(missing[cmdName], ToolReference{
-						Tool:     cmdName,
-						FilePath: rel,
-						LineNum:  lineNum,
-						Context:  line,
-					})
+					if idx := strings.Index(val, "#"); idx != -1 {
+						val = val[:idx]
+					}
 				}
+
+				// Split on command separators (;, &&, ||, |)
+				parts := strings.FieldsFunc(val, func(r rune) bool {
+					return r == ';' || r == '|' || r == '&'
+				})
+				for _, part := range parts {
+					words := strings.Fields(strings.TrimSpace(part))
+					if len(words) > 0 {
+						checkCandidate(words[0], rel, lineNum, line, true)
+					}
+				}
+			}
+
+			// 2. Check eval "$(tool ...)" invocations (required)
+			if sm := evalCmdRegex.FindStringSubmatch(line); len(sm) > 1 {
+				checkCandidate(sm[1], rel, lineNum, line, true)
+			}
+
+			// 3. Check command -v / which probes (optional - recorded if installed, not reported as missing)
+			if sm := probeCmdRegex.FindStringSubmatch(line); len(sm) > 1 {
+				checkCandidate(sm[1], rel, lineNum, line, false)
 			}
 		}
 		return nil
