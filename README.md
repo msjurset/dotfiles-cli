@@ -275,6 +275,109 @@ error: audit detected 2 potential credential(s)
 
 The secret scanner also runs automatically during `dotfiles update` and `dotfiles sync` to prevent committing or pushing credentials to remote repositories. Use `-f` or `--force` if you intentionally need to commit an exempted pattern.
 
+### `dotfiles which <name>`
+
+Trace where an alias, shell function, autoload function, or environment variable is defined across your managed dotfiles:
+
+```bash
+$ dotfiles which caf
+Found 1 match for "caf":
+  .aliases:180 [alias]
+    alias caf="caffeinate -is"
+
+$ dotfiles which EDITOR
+Found 1 match for "EDITOR":
+  .zshrc:12 [variable / export]
+    export EDITOR="nvim"
+```
+
+Searches standard shell configuration files (`.zshrc`, `.bashrc`, `.aliases`, etc.) as well as autoload function directories (`.zfuncs/*`, `.bash_completion.d/*`).
+
+### `dotfiles deps [--strict|-s]`
+
+Audit external CLI commands and binaries called by your shell dotfiles against the system `PATH`:
+
+```bash
+$ dotfiles deps
+Auditing command dependencies in managed shell configs...
+
+Installed dependencies (14):
+  bat, brew, caffeinate, curl, eza, fd, fzf, git, jq, nvim, rg, tmux, zoxide, zsh
+
+Missing dependencies (1):
+  [MISSING] delta (referenced in .gitconfig)
+```
+
+Use `--strict` or `-s` in CI or machine bootstrap scripts to exit with a non-zero code if any missing dependencies are discovered.
+
+### `dotfiles profile [name|--clear]`
+
+Zero-template machine configuration overlays. Keep your shared base configs in `~/.dotfiles` and place machine-specific overrides in `~/.dotfiles/profiles/<name>/` (e.g. `work`, `personal`):
+
+```bash
+# List available profiles and see which one is active
+$ dotfiles profile
+Available profiles:
+  * work (active)
+    personal
+
+# Switch to a profile
+$ dotfiles profile personal
+profile: Switched to profile personal (2 file(s) linked).
+
+# Deactivate the current profile and safely unlink its overlay files
+$ dotfiles profile --clear
+profile: Deactivated profile personal.
+```
+
+When switching profiles, existing overlay symlinks from the prior profile are automatically replaced.
+
+### `dotfiles browse [query]` / `dotfiles fzf [query]`
+
+Interactive fuzzy finder powered by `fzf` with a live side-by-side preview window:
+- If a file has uncommitted git modifications, the preview shows the colored git diff.
+- If clean, it shows the syntax-highlighted file content using `bat` (falling back to `cat`).
+- Pressing `Enter` opens the selected file directly in `$EDITOR`.
+- Pass `--print` or `-p` to print the selected file path to stdout instead of opening in an editor.
+
+```bash
+# Launch interactive browser
+$ dotfiles browse
+
+# Pre-populate search query
+$ dotfiles fzf kitty
+
+# Pipe selected path to another command
+$ cat $(dotfiles browse --print)
+```
+
+### `dotfiles snapshot [name]` & `dotfiles rollback <name>`
+
+Lightweight, tag-based checkpoints for safe configuration experimentation.
+
+```bash
+# Create a named checkpoint before testing complex changes
+$ dotfiles snapshot pre-zsh-overhaul
+snapshot: Created snapshot pre-zsh-overhaul.
+
+# Or create a timestamped snapshot
+$ dotfiles snapshot
+snapshot: Created snapshot 20261009-201500.
+
+# List all saved snapshots
+$ dotfiles snapshot --list
+Available snapshots:
+  pre-zsh-overhaul          10 minutes ago       Snapshot: pre-zsh-overhaul
+  20261009-201500           2 minutes ago        Snapshot: 20261009-201500
+
+# Roll back repo and symlinks to a checkpoint
+$ dotfiles rollback pre-zsh-overhaul
+rollback: Successfully rolled back to snapshot pre-zsh-overhaul.
+Safety snapshot created: pre-rollback-20261009-202500 (run 'dotfiles rollback pre-rollback-20261009-202500' to undo).
+```
+
+`rollback` automatically captures a safety snapshot before modifying any files, safely cleans up files added after the snapshot tag, and synchronizes all symlinks in `$HOME`.
+
 ### `dotfiles edit [query]`
 
 Quickly jump straight into editing any managed dotfile in `$EDITOR` (or `$VISUAL`, `nvim`, `vim`, `nano`) regardless of your current directory:

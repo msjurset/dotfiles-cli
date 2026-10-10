@@ -17,25 +17,14 @@ func Edit(query string) error {
 		return err
 	}
 
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = os.Getenv("VISUAL")
-	}
-	if editor == "" {
-		for _, candidate := range []string{"nvim", "vim", "vi", "nano"} {
-			if _, err := exec.LookPath(candidate); err == nil {
-				editor = candidate
-				break
-			}
-		}
-	}
-	if editor == "" {
-		return fmt.Errorf("no editor found (set $EDITOR or $VISUAL)")
+	editor, err := FindEditor()
+	if err != nil {
+		return err
 	}
 
 	// If no query passed, open repo directory
 	if query == "" {
-		return runEditor(editor, r.Path)
+		return RunEditor(editor, r.Path)
 	}
 
 	// Search for dotfile matching query
@@ -71,7 +60,7 @@ func Edit(query string) error {
 
 	targetAbs := filepath.Join(r.Path, target)
 	fmt.Printf("Editing %s with %s...\n", color.Bold(target), color.Cyan(editor))
-	if err := runEditor(editor, targetAbs); err != nil {
+	if err := RunEditor(editor, targetAbs); err != nil {
 		return err
 	}
 
@@ -131,7 +120,25 @@ func matchDotfile(query string, files []string) string {
 	return ""
 }
 
-func runEditor(editor string, path string) error {
+func FindEditor() (string, error) {
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = os.Getenv("VISUAL")
+	}
+	if editor == "" {
+		for _, candidate := range []string{"nvim", "vim", "vi", "nano"} {
+			if _, err := exec.LookPath(candidate); err == nil {
+				return candidate, nil
+			}
+		}
+	}
+	if editor == "" {
+		return "", fmt.Errorf("no editor found (set $EDITOR or $VISUAL)")
+	}
+	return editor, nil
+}
+
+func RunEditor(editor string, path string) error {
 	parts := strings.Fields(editor)
 	args := append(parts[1:], path)
 	cmd := exec.Command(parts[0], args...)

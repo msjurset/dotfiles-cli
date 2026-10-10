@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func (r *Repo) Git(args ...string) (string, error) {
@@ -129,3 +130,88 @@ func (r *Repo) Log(count int, path string) ([]CommitInfo, error) {
 	}
 	return commits, nil
 }
+
+type SnapshotInfo struct {
+	Name    string
+	Tag     string
+	Date    string
+	Subject string
+}
+
+func (r *Repo) TagExists(tag string) bool {
+	_, err := r.Git("rev-parse", "--verify", "refs/tags/"+tag)
+	return err == nil
+}
+
+func (r *Repo) CreateSnapshot(name string) (string, error) {
+	if strings.TrimSpace(name) == "" {
+		name = time.Now().Format("20060102-150405")
+	}
+	name = strings.TrimPrefix(name, "snapshot/")
+	tagName := "snapshot/" + name
+
+	if r.TagExists(tagName) {
+		return "", fmt.Errorf("snapshot %q already exists", name)
+	}
+
+	// If there are uncommitted changes, commit them before tagging
+	status, err := r.StatusPorcelain()
+	if err == nil && strings.TrimSpace(status) != "" {
+		_ = r.Add(".")
+		_ = r.Commit(fmt.Sprintf("snapshot: %s", name))
+	}
+
+	_, err = r.Git("tag", "-a", tagName, "-m", fmt.Sprintf("Snapshot: %s", name))
+	if err != nil {
+		return "", fmt.Errorf("creating snapshot tag: %w", err)
+	}
+	return name, nil
+}
+
+func (r *Repo) ListSnapshots() ([]SnapshotInfo, error) {
+	out, err := r.Git("tag", "-l", "--format=%(refname:short)|%(creatordate:relative)|%(authordate:relative)|%(subject)", "snapshot/*")
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(out) == "" {
+		return nil, nil
+	}
+	var list []SnapshotInfo
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.Split(line, "|")
+		tag := parts[0]
+		name := strings.TrimPrefix(tag, "snapshot/")
+		date := ""
+		if len(parts) > 1 && parts[1] != "" {
+			date = parts[1]
+		} else if len(parts) > 2 && parts[2] != "" {
+			date = parts[2]
+		}
+		subj := ""
+		if len(parts) > 3 {
+			subj = parts[3]
+		}
+		list = append(list, SnapshotInfo{
+			Name:    name,
+			Tag:     tag,
+			Date:    date,
+			Subject: subj,
+		})
+	}
+	return list, nil
+}
+
+func (r *Repo) DeleteSnapshot(name string) error {
+	name = strings.TrimPrefix(name, "snapshot/")
+	tagName := "snapshot/" + name
+	if !r.TagExists(tagName) {
+		return fmt.Errorf("snapshot %q not found", name)
+	}
+	_, err := r.Git("tag", "-d", tagName)
+	return err
+}
+

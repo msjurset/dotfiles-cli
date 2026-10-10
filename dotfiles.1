@@ -1,4 +1,4 @@
-.TH DOTFILES 1 "April 2026" "version 1.3.0" "User Commands"
+.TH DOTFILES 1 "October 2026" "version 1.4.0" "User Commands"
 .SH NAME
 dotfiles \- manage dotfiles with symlinks and git
 .SH SYNOPSIS
@@ -30,6 +30,31 @@ dotfiles \- manage dotfiles with symlinks and git
 .br
 .B dotfiles audit
 [\fIpath\fR ...]
+.br
+.B dotfiles which
+.I name
+.br
+.B dotfiles deps
+[\fB\-s\fR|\fB\-\-strict\fR]
+.br
+.B dotfiles profile
+[\fIname\fR|\fB\-\-clear\fR]
+.br
+.B dotfiles browse
+[\fB\-p\fR|\fB\-\-print\fR]
+[\fIquery\fR]
+.br
+.B dotfiles fzf
+[\fB\-p\fR|\fB\-\-print\fR]
+[\fIquery\fR]
+.br
+.B dotfiles snapshot
+[\fB\-l\fR|\fB\-\-list\fR]
+[\fB\-d\fR|\fB\-\-delete\fR \fIname\fR]
+[\fIname\fR]
+.br
+.B dotfiles rollback
+.I name
 .br
 .B dotfiles edit
 [\fIquery\fR]
@@ -141,6 +166,64 @@ to automatically repair issues and backup modified local files.
 Scan managed dotfiles in the repository for credentials, private keys, AWS tokens,
 GitHub PATs, Google API keys, OpenAI keys, and Slack tokens.
 .TP
+.B which \fIname\fR
+Trace the origin of an alias, shell function, autoload function, or environment variable
+across managed configuration files. Displays file path, line number, definition kind,
+and code snippet.
+.TP
+.B deps [\fB\-s\fR|\fB\-\-strict\fR]
+Audit external binary commands and CLI tools referenced in your shell dotfiles against
+the current
+.BR PATH .
+Identifies installed and missing tools. With
+.B \-\-strict
+or
+.BR \-s ,
+exits with a non-zero status code if missing dependencies are detected.
+.TP
+.B profile [\fIname\fR|\fB\-\-clear\fR]
+Manage machine configuration overlays located in
+.IR ~/.dotfiles/profiles/<name>/ .
+Symlinks overlay files directly into
+.I $HOME
+and tracks the active profile in
+.IR ~/.dotfiles/.active_profile .
+Pass
+.B \-\-clear
+to deactivate the current profile and safely unlink its overlay files.
+.TP
+.B browse [\fB\-p\fR|\fB\-\-print\fR] [\fIquery\fR]
+Interactive fuzzy finder powered by
+.B fzf
+with real-time side-by-side preview showing uncommitted git diffs or syntax-highlighted
+file contents. Pressing Enter opens the selected file directly in
+.BR $EDITOR .
+Pass
+.B \-p
+or
+.B \-\-print
+to output the selected path to standard output instead.
+.B dotfiles fzf
+is an alias for
+.BR "dotfiles browse" .
+.TP
+.B snapshot [\fB\-l\fR|\fB\-\-list\fR] [\fB\-d\fR|\fB\-\-delete\fR \fIname\fR] [\fIname\fR]
+Create a lightweight, tagged checkpoint of your dotfiles repository using git tags
+under
+.IR snapshot/<name> .
+If no name is specified, a timestamped snapshot is created. Pass
+.B \-\-list
+to view existing snapshots, or
+.B \-\-delete
+to remove a snapshot.
+.TP
+.B rollback \fIname\fR
+Safely restore the dotfiles repository and all symlinks to the exact state saved in
+.IR snapshot/<name> .
+Automatically takes a safety snapshot before modifying files, cleans up newly added files,
+and refreshes symlinks in
+.IR $HOME .
+.TP
 .B edit [\fIquery\fR]
 Find and open matching managed dotfile directly in
 .B $EDITOR
@@ -190,6 +273,22 @@ and
 Automatically repair health issues identified by
 .BR doctor .
 .TP
+.BR \-s ", " \-\-strict
+Exit with non-zero exit status if missing external command dependencies are detected during
+.BR deps .
+.TP
+.BR \-l ", " \-\-list
+List available saved snapshots in
+.BR snapshot .
+.TP
+.BR \-d ", " \-\-delete " \fIname\fR"
+Delete specified snapshot in
+.BR snapshot .
+.TP
+.BR \-p ", " \-\-print
+Print selected file path to standard output instead of opening in editor in
+.BR browse .
+.TP
 .BR \-m " \fImessage\fR"
 Commit message for
 .B update
@@ -217,11 +316,28 @@ Path to the dotfiles git repository. Defaults to
 .TP
 .B EDITOR ", " VISUAL
 Default text editor invoked by
-.BR edit .
+.B edit
+and
+.BR browse .
 .SH EXAMPLES
 .TP
-.B dotfiles doctor
-Check for clobbered or broken symlinks.
+.B dotfiles which caf
+Locate where alias or function "caf" is defined across managed dotfiles.
+.TP
+.B dotfiles deps
+Audit external CLI tools and dependencies referenced in your shell configs.
+.TP
+.B dotfiles profile work
+Activate "work" machine overlay profile (~/.dotfiles/profiles/work/).
+.TP
+.B dotfiles browse
+Fuzzy browse dotfiles with live git diff preview and jump into editor.
+.TP
+.B dotfiles snapshot pre-zsh-upgrade
+Save a named checkpoint tag of your dotfiles configuration.
+.TP
+.B dotfiles rollback pre-zsh-upgrade
+Safely restore dotfiles and symlinks to the saved checkpoint.
 .TP
 .B dotfiles doctor --fix
 Repair broken symlinks and backup clobbered files.
@@ -231,12 +347,6 @@ Scan dotfiles for leaked secrets.
 .TP
 .B dotfiles edit zsh
 Open ~/.dotfiles/.zshrc in your configured editor.
-.TP
-.B dotfiles log -n 5
-Show last 5 dotfiles commits with relative timestamps.
-.TP
-.B dotfiles diff
-Show working tree differences against git repo.
 .TP
 .B dotfiles sync
 Pull remote changes, relink, commit and push.

@@ -89,7 +89,10 @@ func linkEntries(r *repo.Repo, entries []string, quiet bool) error {
 	if err != nil {
 		return fmt.Errorf("getting home dir: %w", err)
 	}
+	return linkEntriesToHome(r, home, entries, quiet)
+}
 
+func linkEntriesToHome(r *repo.Repo, home string, entries []string, quiet bool) error {
 	var linked, skipped, failed int
 	for _, repoRel := range entries {
 		repoPath := filepath.Join(r.Path, repoRel)

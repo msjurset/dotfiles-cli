@@ -150,3 +150,45 @@ func contains(s, sub string) bool {
 	}
 	return false
 }
+
+func TestSnapshots(t *testing.T) {
+	r := initTestRepo(t)
+
+	// Create a snapshot
+	name, err := r.CreateSnapshot("initial")
+	if err != nil {
+		t.Fatalf("CreateSnapshot failed: %v", err)
+	}
+	if name != "initial" {
+		t.Fatalf("expected name 'initial', got %q", name)
+	}
+
+	// Verify tag exists
+	if !r.TagExists("snapshot/initial") {
+		t.Fatalf("expected tag snapshot/initial to exist")
+	}
+
+	// Creating duplicate fails
+	if _, err := r.CreateSnapshot("initial"); err == nil {
+		t.Fatalf("expected error creating duplicate snapshot")
+	}
+
+	// List snapshots
+	list, err := r.ListSnapshots()
+	if err != nil {
+		t.Fatalf("ListSnapshots failed: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "initial" {
+		t.Fatalf("expected 1 snapshot named 'initial', got: %+v", list)
+	}
+
+	// Delete snapshot
+	if err := r.DeleteSnapshot("initial"); err != nil {
+		t.Fatalf("DeleteSnapshot failed: %v", err)
+	}
+
+	if r.TagExists("snapshot/initial") {
+		t.Fatalf("expected tag snapshot/initial to be deleted")
+	}
+}
+

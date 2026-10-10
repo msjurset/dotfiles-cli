@@ -16,6 +16,13 @@ _dotfiles() {
         'update:stage, commit, and push changes'
         'doctor:check health of symlinks and permissions'
         'audit:scan managed dotfiles for sensitive credentials'
+        'which:trace where an alias, function, or export is defined'
+        'deps:audit external command dependencies across shell configs'
+        'profile:manage machine configuration overlay profiles'
+        'browse:interactive fuzzy finder with live preview and diffs'
+        'fzf:interactive fuzzy finder with live preview and diffs'
+        'snapshot:create or list tagged config checkpoints'
+        'rollback:revert repo and symlinks to a saved snapshot'
         'edit:open matching dotfile directly in $EDITOR'
         'log:show commit history for dotfiles repo or specific file'
         'ignore:view or add patterns to .dotfilesignore'
@@ -60,6 +67,34 @@ _dotfiles() {
                 audit|edit|clean|link)
                     _files -g '.*'
                     ;;
+                deps)
+                    _arguments \
+                        '(-s --strict)'{-s,--strict}'[fail if any dependencies are missing]'
+                    ;;
+                profile)
+                    _arguments \
+                        '(--clear)--clear[deactivate active profile]' \
+                        '1:profile:'
+                    ;;
+                browse|fzf)
+                    _arguments \
+                        '(-p --print)'{-p,--print}'[print selected path instead of opening in editor]' \
+                        '*:query:'
+                    ;;
+                snapshot)
+                    _arguments \
+                        '(-l --list)'{-l,--list}'[list available snapshots]' \
+                        '(-d --delete)'{-d,--delete}'[delete snapshot]:snapshot:' \
+                        '*:name:'
+                    ;;
+                rollback)
+                    _arguments \
+                        '1:snapshot:'
+                    ;;
+                which)
+                    _arguments \
+                        '1:name:'
+                    ;;
                 log)
                     _arguments \
                         '-n[number of commits to display]:count:' \
@@ -92,7 +127,7 @@ _dotfiles() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    commands="status diff add sync update doctor audit edit log ignore guard clone link clean"
+    commands="status diff add sync update doctor audit which deps profile browse fzf snapshot rollback edit log ignore guard clone link clean"
 
     if [[ ${COMP_CWORD} -eq 1 ]]; then
         if [[ "$cur" == -* ]]; then
@@ -136,7 +171,31 @@ _dotfiles() {
                 return 0
             fi
             ;;
-        audit|edit|clean|link)
+        deps)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-s --strict" -- "$cur") )
+                return 0
+            fi
+            ;;
+        profile)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "--clear" -- "$cur") )
+                return 0
+            fi
+            ;;
+        browse|fzf)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-p --print" -- "$cur") )
+                return 0
+            fi
+            ;;
+        snapshot)
+            if [[ "$cur" == -* ]]; then
+                COMPREPLY=( $(compgen -W "-l --list -d --delete" -- "$cur") )
+                return 0
+            fi
+            ;;
+        audit|edit|clean|link|which|rollback)
             COMPREPLY=( $(compgen -f -X '!.*' -- "$cur") )
             return 0
             ;;
