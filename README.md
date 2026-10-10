@@ -397,9 +397,9 @@ View a compact, formatted history of your configuration changes with relative ti
 
 ```bash
 $ dotfiles log -n 5
-  9ea22e8  (3 hours ago)   Mark Sjurseth   Add in-repo awareness, ignore filtering, guardrails
-  973780d  (yesterday)     Mark Sjurseth   Add caf alias and mybrewapps speedup
-  dd825b8  (2 days ago)    Mark Sjurseth   Add stow compatibility docs
+  9ea22e8  (3 hours ago)   Your Name       Add in-repo awareness, ignore filtering, guardrails
+  973780d  (yesterday)     Your Name       Add caf alias and mybrewapps speedup
+  dd825b8  (2 days ago)    Your Name       Add stow compatibility docs
 
 # View history specific to a file
 $ dotfiles log .zshrc
